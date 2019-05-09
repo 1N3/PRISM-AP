@@ -31,7 +31,8 @@ logo
 # NOTE: Any changes made below will need to be updated manually in dhcpd.conf and the hostapd.conf.
 #
 WLAN='wlan0' # REPLACE WITH WIRELESS INTERFACE
-INET='eth0' # REPLACE WITH INTERNET INTERFACEINSTALL_DIR="/usr/share/prism-ap" # INSTALL DIRECTORY
+INET='eth0' # REPLACE WITH INTERNET INTERFACE
+INSTALL_DIR="/usr/share/prism-ap" # INSTALL DIRECTORY
 HOSTAPD='/usr/lib/mana-toolkit/hostapd' # MANA HOSTAPD PATCH
 HOSTAPD_CONF='karma.conf' # KARMA ATTACK CONFIG
 DHCPD_CONF="dhcpd.conf" # FULL PATH TO DHCPD.CONF
@@ -40,22 +41,24 @@ CHAN='6' # WIRELESS CHANNEL
 SSID='GuestWifi' # SSID OF AP
 
 cd $INSTALL_DIR 
+mkdir -p $INSTALL_DIR/bak/ 2> /dev/null
+mkdir -p $INSTALL_DIR/logs/ 2> /dev/null
 
 # INIT
-service network-manager stop
-rfkill unblock wlan
-ifconfig $WLAN down
-macchanger -r $WLAN
-ifconfig $WLAN up
+service network-manager stop 2> /dev/null
+rfkill unblock wlan 2> /dev/null
+ifconfig $WLAN down 2> /dev/null
+macchanger -r $WLAN 2> /dev/null
+ifconfig $WLAN up 2> /dev/null
 
 # CLEANUP
-iptables --flush 
-iptables --table nat --flush
-iptables --delete-chain
-iptables --table nat --delete-chain
-echo 0 > /proc/sys/net/ipv4/ip_forward
+iptables --flush 2> /dev/null
+iptables --table nat --flush 2> /dev/null
+iptables --delete-chain 2> /dev/null
+iptables --table nat --delete-chain 2> /dev/null
+echo 0 > /proc/sys/net/ipv4/ip_forward 2> /dev/null
 killall hostapd dhcpd beef-xss beef ruby bettercap xterm driftnet wireshark tcpdump 2> /dev/null
-tar -zcvf $INSTALL_DIR/bak/logs-`date +%s`.bak.tar.gz $INSTALL_DIR/logs/
+tar -zcvf $INSTALL_DIR/bak/logs-`date +%s`.bak.tar.gz $INSTALL_DIR/logs/ 2> /dev/null
 sleep 5
 
 echo -e "$OKBLUE Do you want to start Evil AP?"
